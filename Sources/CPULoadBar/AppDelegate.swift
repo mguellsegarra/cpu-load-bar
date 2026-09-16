@@ -2,10 +2,9 @@ import AppKit
 import ServiceManagement
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
   private enum StatusAppearance: Equatable {
-    case normalCPU
-    case elevatedCPU
+    case cpu(CPUAlertLevel)
     case elevatedMemory
   }
 
@@ -16,7 +15,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var displayedText: String?
   private var displayedDarkAppearance: Bool?
   private var refreshTimer: Timer?
+  private var cpuBusySampler = CPUBusySampler()
   private var processRefreshTask: Task<Void, Never>?
+  private var copyConfirmationPanel: NSPanel?
+  private var copyConfirmationTimer: Timer?
+  private var pendingCopiedProcessName: String?
+  private var copyConfirmationScheduled = false
+  private var isProcessMenuOpen = false
   private var currentProcessMetric: ProcessMetricKind?
   private var lastProcessRefresh = Date.distantPast
   private let loginItemService = SMAppService.mainApp
@@ -24,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private let oneMinuteItem = NSMenuItem(title: "1 min: —", action: nil, keyEquivalent: "")
   private let fiveMinuteItem = NSMenuItem(title: "5 min: —", action: nil, keyEquivalent: "")
   private let fifteenMinuteItem = NSMenuItem(title: "15 min: —", action: nil, keyEquivalent: "")
+  private let cpuBusyItem = NSMenuItem(title: "CPU busy (recent): —", action: nil, keyEquivalent: "")
   private let memoryPressureItem = NSMenuItem(
     title: "Memory pressure: —",
     action: nil,
@@ -61,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationWillTerminate(_ notification: Notification) {
     refreshTimer?.invalidate()
     processRefreshTask?.cancel()
+    copyConfirmationTimer?.invalidate()
   }
 
   private func configureStatusItem() {
@@ -71,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     if let button = item.button {
       button.imagePosition = .imageLeading
       showStatus(
-        appearance: .normalCPU,
+        appearance: .cpu(.normal),
         text: "—",
         accessibilityLabel: "CPU load average",
         accessibilityValue: "Unavailable"
@@ -79,6 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     let menu = NSMenu()
+    menu.delegate = self
     let activityMonitorItem = NSMenuItem(
       title: "Open Activity Monitor",
       action: #selector(openActivityMonitor),
@@ -106,10 +114,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     oneMinuteItem.isEnabled = false
     fiveMinuteItem.isEnabled = false
     fifteenMinuteItem.isEnabled = false
+    cpuBusyItem.isEnabled = false
     memoryPressureItem.isEnabled = false
     menu.addItem(oneMinuteItem)
     menu.addItem(fiveMinuteItem)
     menu.addItem(fifteenMinuteItem)
+    menu.addItem(cpuBusyItem)
     menu.addItem(memoryPressureItem)
     menu.addItem(.separator())
 
@@ -156,6 +166,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     let memoryPressure = MemoryPressureLevel.current()
+    let busyFraction = cpuBusySampler.sample()
     let oneMinute = format(loadAverage.oneMinute)
     let fiveMinutes = format(loadAverage.fiveMinutes)
     let fifteenMinutes = format(loadAverage.fifteenMinutes)
@@ -163,6 +174,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     oneMinuteItem.title = "1 min: \(oneMinute)"
     fiveMinuteItem.title = "5 min: \(fiveMinutes)"
     fifteenMinuteItem.title = "15 min: \(fifteenMinutes)"
+    cpuBusyItem.title = busyFraction.map {
+      "CPU busy (recent): \(Int(($0 * 100).rounded()))%"
+    } ?? "CPU busy (recent): —"
     updateMemoryPressureItem(memoryPressure)
 
     let metric = selectMenuBarMetric(
@@ -180,7 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func showUnavailableState() {
     showStatus(
-      appearance: .normalCPU,
+      appearance: .cpu(.normal),
       text: "—",
       accessibilityLabel: "CPU load average",
       accessibilityValue: "Unavailable"
@@ -189,15 +203,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     oneMinuteItem.title = "1 min: unavailable"
     fiveMinuteItem.title = "5 min: unavailable"
     fifteenMinuteItem.title = "15 min: unavailable"
+    cpuBusyItem.title = "CPU busy (recent): —"
     updateMemoryPressureItem(.unavailable)
     hideTopProcesses()
   }
 
   private func show(metric: MenuBarMetric, formattedLoad: String) {
     switch metric {
-    case .cpu(_, let elevated):
+    case .cpu(_, let alert):
       showStatus(
-        appearance: elevated ? .elevatedCPU : .normalCPU,
+        appearance: .cpu(alert),
         text: formattedLoad,
         accessibilityLabel: "CPU load average",
         accessibilityValue: formattedLoad
@@ -230,8 +245,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       || displayedDarkAppearance != darkAppearance
     let color: NSColor?
     switch appearance {
-    case .normalCPU: color = nil
-    case .elevatedCPU: color = warningRed
+    case .cpu(.normal): color = nil
+    case .cpu(let level): color = cpuColor(for: level)
     case .elevatedMemory: color = memoryPurple
     }
 
@@ -247,10 +262,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let configuration = NSImage.SymbolConfiguration(paletteColors: [color])
         let image = symbol?.withSymbolConfiguration(configuration)
         image?.isTemplate = false
-        button.image = image
+        button.image = image.map(alignStatusImage)
       } else {
         symbol?.isTemplate = true
-        button.image = symbol
+        button.image = symbol.map(alignStatusImage)
       }
       displayedAppearance = appearance
       displayedDarkAppearance = darkAppearance
@@ -271,10 +286,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     button.setAccessibilityValue(accessibilityValue)
   }
 
+  private func alignStatusImage(_ image: NSImage) -> NSImage {
+    let aligned = NSImage(size: image.size, flipped: false) { _ in
+      image.draw(
+        in: NSRect(x: 0, y: 0.5, width: image.size.width, height: image.size.height),
+        from: .zero,
+        operation: .sourceOver,
+        fraction: 1
+      )
+      return true
+    }
+    aligned.isTemplate = image.isTemplate
+    return aligned
+  }
+
   private var warningRed: NSColor {
     adaptiveColor(
       light: NSColor(srgbRed: 0.70, green: 0.13, blue: 0.18, alpha: 1),
       dark: NSColor.systemRed.withAlphaComponent(0.9)
+    )
+  }
+
+  private func cpuColor(for level: CPUAlertLevel) -> NSColor {
+    let light: UInt32
+    let dark: UInt32
+    switch level {
+    case .normal: return .labelColor
+    case .elevated: (light, dark) = (0x9A4A37, 0xD9957F)
+    case .high: (light, dark) = (0xAE2F2C, 0xEB7067)
+    case .extreme: (light, dark) = (0x77112D, 0xFF4969)
+    }
+    return adaptiveColor(light: rgb(light), dark: rgb(dark))
+  }
+
+  private func rgb(_ value: UInt32) -> NSColor {
+    NSColor(
+      srgbRed: CGFloat((value >> 16) & 0xFF) / 255,
+      green: CGFloat((value >> 8) & 0xFF) / 255,
+      blue: CGFloat(value & 0xFF) / 255,
+      alpha: 1
     )
   }
 
@@ -316,11 +366,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func refreshTopProcesses(for metric: MenuBarMetric) {
+    guard !isProcessMenuOpen else { return }
+
     let processMetric: ProcessMetricKind?
     switch metric {
-    case .cpu(_, elevated: true): processMetric = .cpu
+    case .cpu(_, let alert) where alert != .normal: processMetric = .cpu
     case .memory: processMetric = .memory
-    case .cpu(_, elevated: false): processMetric = nil
+    case .cpu: processMetric = nil
     }
 
     guard let processMetric else {
@@ -365,7 +417,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     _ usages: [ProcessUsage],
     for metric: ProcessMetricKind
   ) {
-    guard currentProcessMetric == metric else { return }
+    guard !isProcessMenuOpen, currentProcessMetric == metric else { return }
 
     for (index, item) in topProcessItems.enumerated() {
       guard usages.indices.contains(index) else {
@@ -399,6 +451,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func hideTopProcesses() {
+    guard !isProcessMenuOpen else { return }
+
     currentProcessMetric = nil
     processRefreshTask?.cancel()
     topProcessesHeading.isHidden = true
@@ -414,7 +468,117 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
-    pasteboard.setString(processName, forType: .string)
+    guard pasteboard.setString(processName, forType: .string) else {
+      NSSound.beep()
+      return
+    }
+    pendingCopiedProcessName = processName
+    scheduleCopyConfirmation()
+  }
+
+  func menuWillOpen(_ menu: NSMenu) {
+    isProcessMenuOpen = true
+    dismissCopyConfirmation()
+  }
+
+  func menuDidClose(_ menu: NSMenu) {
+    isProcessMenuOpen = false
+    scheduleCopyConfirmation()
+    lastProcessRefresh = .distantPast
+    DispatchQueue.main.async { [weak self] in
+      self?.refresh()
+    }
+  }
+
+  private func scheduleCopyConfirmation() {
+    guard pendingCopiedProcessName != nil, !copyConfirmationScheduled else { return }
+    copyConfirmationScheduled = true
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+      guard let self else { return }
+      self.copyConfirmationScheduled = false
+      guard !self.isProcessMenuOpen, let processName = self.pendingCopiedProcessName else {
+        return
+      }
+      self.pendingCopiedProcessName = nil
+      self.showCopyConfirmation(for: processName)
+    }
+  }
+
+  private func showCopyConfirmation(for processName: String) {
+    let pointer = NSEvent.mouseLocation
+    guard let screen = NSScreen.screens.first(where: { $0.frame.contains(pointer) })
+      ?? NSScreen.main else { return }
+
+    copyConfirmationTimer?.invalidate()
+    copyConfirmationPanel?.close()
+
+    let size = NSSize(width: 280, height: 58)
+    let contentView = NSVisualEffectView(frame: NSRect(origin: .zero, size: size))
+    contentView.material = .popover
+    contentView.blendingMode = .behindWindow
+    contentView.state = .active
+    contentView.wantsLayer = true
+    contentView.layer?.cornerRadius = 12
+    contentView.layer?.masksToBounds = true
+    let checkmark = NSImageView(
+      image: NSImage(
+        systemSymbolName: "checkmark.circle.fill",
+        accessibilityDescription: nil
+      ) ?? NSImage()
+    )
+    checkmark.frame = NSRect(x: 14, y: 20, width: 18, height: 18)
+    checkmark.contentTintColor = .systemGreen
+    contentView.addSubview(checkmark)
+
+    let title = NSTextField(labelWithString: "Copied to clipboard")
+    title.font = .systemFont(ofSize: 13, weight: .semibold)
+    title.frame = NSRect(x: 42, y: 30, width: 224, height: 18)
+    contentView.addSubview(title)
+
+    let detail = NSTextField(labelWithString: processName)
+    detail.font = .systemFont(ofSize: 11)
+    detail.textColor = .secondaryLabelColor
+    detail.lineBreakMode = .byTruncatingMiddle
+    detail.frame = NSRect(x: 42, y: 11, width: 224, height: 15)
+    contentView.addSubview(detail)
+
+    let panel = NSPanel(
+      contentRect: NSRect(origin: .zero, size: size),
+      styleMask: [.borderless, .nonactivatingPanel],
+      backing: .buffered,
+      defer: false
+    )
+    panel.contentView = contentView
+    panel.isOpaque = false
+    panel.backgroundColor = .clear
+    panel.hasShadow = true
+    panel.level = .popUpMenu
+    panel.ignoresMouseEvents = true
+    panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    let visible = screen.visibleFrame
+    let centeredX = screen.frame.midX - size.width / 2
+    let topY = visible.maxY - size.height - 12
+    panel.setFrameOrigin(NSPoint(
+      x: min(max(centeredX, visible.minX + 8), visible.maxX - size.width - 8),
+      y: max(topY, visible.minY + 8)
+    ))
+    copyConfirmationPanel = panel
+    panel.orderFrontRegardless()
+
+    copyConfirmationTimer = Timer.scheduledTimer(
+      timeInterval: 2,
+      target: self,
+      selector: #selector(dismissCopyConfirmation),
+      userInfo: nil,
+      repeats: false
+    )
+  }
+
+  @objc private func dismissCopyConfirmation() {
+    copyConfirmationTimer?.invalidate()
+    copyConfirmationPanel?.close()
+    copyConfirmationPanel = nil
+    copyConfirmationTimer = nil
   }
 
   @objc private func openActivityMonitor() {

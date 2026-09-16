@@ -5,12 +5,12 @@ import XCTest
 final class SystemMetricsTests: XCTestCase {
   func testElevatedCPULoadTakesPriorityOverCriticalMemoryPressure() {
     let metric = selectMenuBarMetric(
-      load: 8,
+      load: 18,
       logicalCPUCount: 10,
       memoryPressure: .critical
     )
 
-    XCTAssertEqual(metric, .cpu(load: 8, elevated: true))
+    XCTAssertEqual(metric, .cpu(load: 18, alert: .elevated))
   }
 
   func testElevatedMemoryPressureReplacesNormalCPULoad() {
@@ -30,7 +30,7 @@ final class SystemMetricsTests: XCTestCase {
       memoryPressure: .warning
     )
 
-    XCTAssertEqual(metric, .cpu(load: 2, elevated: false))
+    XCTAssertEqual(metric, .cpu(load: 2, alert: .normal))
   }
 
   func testNormalMemoryPressureKeepsNormalCPULoad() {
@@ -40,7 +40,96 @@ final class SystemMetricsTests: XCTestCase {
       memoryPressure: .normal
     )
 
-    XCTAssertEqual(metric, .cpu(load: 2, elevated: false))
+    XCTAssertEqual(metric, .cpu(load: 2, alert: .normal))
+  }
+
+  func testLoadBelowThresholdDoesNotTriggerAlert() {
+    let metric = selectMenuBarMetric(
+      load: 12.5,
+      logicalCPUCount: 10,
+      memoryPressure: .normal
+    )
+
+    XCTAssertEqual(metric, .cpu(load: 12.5, alert: .normal))
+  }
+
+  func testCriticalMemoryStillShowsWhenCPULoadIsBelowThreshold() {
+    let metric = selectMenuBarMetric(
+      load: 12,
+      logicalCPUCount: 10,
+      memoryPressure: .critical
+    )
+
+    XCTAssertEqual(metric, .memory(.critical))
+  }
+
+  func testExtremeLoadIsVisible() {
+    let metric = selectMenuBarMetric(
+      load: 158,
+      logicalCPUCount: 10,
+      memoryPressure: .normal
+    )
+
+    XCTAssertEqual(metric, .cpu(load: 158, alert: .extreme))
+  }
+
+  func testHighLoadIsVisible() {
+    XCTAssertEqual(
+      CPUAlertLevel.current(load: 40, logicalCPUCount: 10),
+      .high
+    )
+  }
+
+  func testAlertLevelsScaleWithAvailableCPUs() {
+    for cpuCount in [8, 10, 16] {
+      let count = Double(cpuCount)
+      XCTAssertEqual(
+        CPUAlertLevel.current(load: count * 1.3, logicalCPUCount: cpuCount),
+        .normal
+      )
+      XCTAssertEqual(
+        CPUAlertLevel.current(load: count * 1.8, logicalCPUCount: cpuCount),
+        .elevated
+      )
+      XCTAssertEqual(
+        CPUAlertLevel.current(load: count * 3.1, logicalCPUCount: cpuCount),
+        .high
+      )
+      XCTAssertEqual(
+        CPUAlertLevel.current(load: count * 5.1, logicalCPUCount: cpuCount),
+        .extreme
+      )
+    }
+  }
+
+  func testExactAlertThresholds() {
+    XCTAssertEqual(
+      CPUAlertLevel.current(load: 15, logicalCPUCount: 10),
+      .elevated
+    )
+    XCTAssertEqual(
+      CPUAlertLevel.current(load: 30, logicalCPUCount: 10),
+      .high
+    )
+    XCTAssertEqual(
+      CPUAlertLevel.current(load: 50, logicalCPUCount: 10),
+      .extreme
+    )
+  }
+
+  func testNonfiniteCPULoadDoesNotTriggerFalseAlert() {
+    XCTAssertEqual(
+      CPUAlertLevel.current(load: .nan, logicalCPUCount: 10),
+      .normal
+    )
+  }
+
+  func testCPUTimeSampleUsesChangesNotLifetimeTotals() {
+    let previous = CPUTimeSample(user: 100, system: 50, idle: 200, nice: 0)
+    let current = CPUTimeSample(user: 140, system: 60, idle: 250, nice: 0)
+
+    XCTAssertEqual(current.busyFraction(since: previous)!, 0.5, accuracy: 0.0001)
+    XCTAssertNil(previous.busyFraction(since: previous))
   }
 
   func testMemoryPressureKernelLevelsAreMapped() {

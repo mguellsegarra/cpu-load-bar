@@ -27,10 +27,11 @@ The screenshot was captured before the memory-pressure level correction; current
 - One-click access to Activity Monitor
 - Native Open at Login toggle
 - Top three CPU or memory-consuming processes while an alert is active
+- Native, short-lived confirmation after copying a process name
 - Purple memory-chip indicator when memory pressure is critical and CPU load is normal
 - Memory-pressure menu detail graded by level: yellow for warning and red for critical
 - Alert colors adapt to light and dark appearances; normal text follows macOS menu bar colors
-- Subtle red CPU icon and value when CPU load is elevated
+- Progressive CPU alert colors based on load per active CPU and recent CPU usage
 - Two-second refresh interval
 - VoiceOver label and current-value support
 - No Dock icon, third-party dependencies, network requests, analytics or stored data
@@ -71,15 +72,26 @@ Click the menu item to compare the 1, 5 and 15-minute values and see the logical
 
 The menu bar indicator prioritizes the signal that needs attention:
 
-1. CPU stays visible with a subtle red icon and value when the one-minute load reaches 80% of the logical CPU count.
+1. The one-minute CPU load is divided by the number of active logical CPUs. This ratio alone determines the CPU indicator color. The menu also shows **CPU busy (recent)** as context; it does not change the color.
 2. A memory **Warning** is shown only inside the menu, in yellow. When CPU load is below its threshold but memory pressure becomes **Critical**, the menu bar changes to a purple memory-chip indicator.
 3. Otherwise, the normal CPU load remains visible using the standard menu bar color.
 
-While an alert is active, the menu lists the three processes using the most CPU or resident memory directly below **Open Activity Monitor**. Click a process to copy its name to the clipboard. This list refreshes every ten seconds in the background and is hidden when system pressure returns to normal.
+The icon and value share the same color, with a light- and dark-mode variant.
+
+| Level | One-minute load per active CPU | Light | Dark |
+| --- | ---: | --- | --- |
+| Normal | < 1.5 | System label color | System label color |
+| Elevated | ≥ 1.5 and < 3 | `#9A4A37` | `#D9957F` |
+| High | ≥ 3 and < 5 | `#AE2F2C` | `#EB7067` |
+| Extreme | ≥ 5 | `#77112D` | `#FF4969` |
+
+These are visual heuristics, not a claim that the Mac is slow or in danger. Load average can remain high briefly after a demanding task ends. Recent CPU usage is sampled from native macOS CPU-time counters and smoothed for the informational menu value.
+
+While an alert is active, the menu lists the three processes using the most CPU or resident memory directly below **Open Activity Monitor**. Click a process to copy its name to the clipboard; a brief confirmation appears centered below the menu bar on that screen. The rows stay fixed while the menu is open, so the name you click is the name copied. The list refreshes every ten seconds in the background when the menu is closed and is hidden when system pressure returns to normal.
 
 ## Resource use and privacy
 
-CPU Load Bar calls the native `getloadavg(3)` API every two seconds. It does not make network requests, collect analytics or persist information. On the development machine, the idle process measured `0.0%` CPU and approximately `40 MB` resident memory; exact usage varies by macOS version and hardware.
+CPU Load Bar calls the native `getloadavg(3)` and Mach CPU-time APIs every two seconds. It does not make network requests, collect analytics or persist information. On the development machine, the idle process measured `0.0%` CPU and approximately `40 MB` resident memory; exact usage varies by macOS version and hardware.
 
 ## Development
 

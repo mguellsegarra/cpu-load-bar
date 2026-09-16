@@ -10,10 +10,11 @@ resources_dir="$contents_dir/Resources"
 
 cd "$project_dir"
 swift build -c release --arch arm64 --arch x86_64
+binary_dir="$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)"
 
 rm -rf "$app_dir"
 mkdir -p "$macos_dir" "$resources_dir"
-cp ".build/apple/Products/Release/CPULoadBar" "$macos_dir/CPULoadBar"
+cp "$binary_dir/CPULoadBar" "$macos_dir/CPULoadBar"
 cp "Resources/Info.plist" "$contents_dir/Info.plist"
 cp "Resources/AppIcon.icns" "$resources_dir/AppIcon.icns"
 
