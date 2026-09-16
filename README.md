@@ -10,10 +10,12 @@ A tiny, native macOS menu bar app that keeps the current CPU load average visibl
 CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open its menu for the 1, 5 and 15-minute values, the number of logical CPUs, a manual refresh action and Quit.
 
 <p align="center">
-  <img src="docs/screenshots/high-cpu.png" width="600" alt="CPU Load Bar showing a red CPU alert, the top three CPU processes, and urgent memory pressure in its macOS menu" />
+  <img src="docs/screenshots/high-cpu.png" width="600" alt="CPU Load Bar showing a red CPU alert, the top three CPU processes, and memory pressure in its macOS menu" />
   <br />
   <sub>CPU alert · top processes and memory pressure at a glance</sub>
 </p>
+
+The screenshot was captured before the memory-pressure level correction; current builds show macOS warnings as **warning**, not **urgent**.
 
 ## Features
 
@@ -25,8 +27,9 @@ CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open 
 - One-click access to Activity Monitor
 - Native Open at Login toggle
 - Top three CPU or memory-consuming processes while an alert is active
-- Purple memory-chip indicator when memory pressure is urgent or critical and CPU load is normal
-- Memory-pressure menu detail graded by level: yellow for warning, orange for urgent and red for critical
+- Purple memory-chip indicator when memory pressure is critical and CPU load is normal
+- Memory-pressure menu detail graded by level: yellow for warning and red for critical
+- Alert colors adapt to light and dark appearances; normal text follows macOS menu bar colors
 - Subtle red CPU icon and value when CPU load is elevated
 - Two-second refresh interval
 - VoiceOver label and current-value support
@@ -69,7 +72,7 @@ Click the menu item to compare the 1, 5 and 15-minute values and see the logical
 The menu bar indicator prioritizes the signal that needs attention:
 
 1. CPU stays visible with a subtle red icon and value when the one-minute load reaches 80% of the logical CPU count.
-2. A memory **Warning** is shown only inside the menu, in yellow. When CPU load is below its threshold but memory pressure becomes **Urgent** or **Critical**, the menu bar changes to a purple memory-chip indicator.
+2. A memory **Warning** is shown only inside the menu, in yellow. When CPU load is below its threshold but memory pressure becomes **Critical**, the menu bar changes to a purple memory-chip indicator.
 3. Otherwise, the normal CPU load remains visible using the standard menu bar color.
 
 While an alert is active, the menu lists the three processes using the most CPU or resident memory directly below **Open Activity Monitor**. Click a process to copy its name to the clipboard. This list refreshes every ten seconds in the background and is hidden when system pressure returns to normal.

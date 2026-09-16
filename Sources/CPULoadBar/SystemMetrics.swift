@@ -22,16 +22,16 @@ struct LoadAverage: Equatable {
 enum MemoryPressureLevel: Equatable {
   case normal
   case warning
-  case urgent
   case critical
   case unavailable
 
   init(kernelLevel: Int32) {
     switch kernelLevel {
-    case 0: self = .normal
-    case 1: self = .warning
-    case 2: self = .urgent
-    case 3...: self = .critical
+    // This sysctl returns NOTE_MEMORYSTATUS_PRESSURE_* flags, not the
+    // kernel's internal 0...3 pressure levels.
+    case 1: self = .normal
+    case 2: self = .warning
+    case 4: self = .critical
     default: self = .unavailable
     }
   }
@@ -52,7 +52,7 @@ enum MemoryPressureLevel: Equatable {
 
   var isElevated: Bool {
     switch self {
-    case .urgent, .critical: true
+    case .critical: true
     case .normal, .warning, .unavailable: false
     }
   }
@@ -61,7 +61,6 @@ enum MemoryPressureLevel: Equatable {
     switch self {
     case .normal: "normal"
     case .warning: "warning"
-    case .urgent: "urgent"
     case .critical: "critical"
     case .unavailable: "unavailable"
     }

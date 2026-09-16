@@ -17,10 +17,10 @@ final class SystemMetricsTests: XCTestCase {
     let metric = selectMenuBarMetric(
       load: 2,
       logicalCPUCount: 10,
-      memoryPressure: .urgent
+      memoryPressure: .critical
     )
 
-    XCTAssertEqual(metric, .memory(.urgent))
+    XCTAssertEqual(metric, .memory(.critical))
   }
 
   func testWarningMemoryPressureKeepsNormalCPULoad() {
@@ -44,10 +44,12 @@ final class SystemMetricsTests: XCTestCase {
   }
 
   func testMemoryPressureKernelLevelsAreMapped() {
-    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 0), .normal)
-    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 1), .warning)
-    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 2), .urgent)
-    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 3), .critical)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 1), .normal)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 2), .warning)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 4), .critical)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 0), .unavailable)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 3), .unavailable)
+    XCTAssertEqual(MemoryPressureLevel(kernelLevel: 5), .unavailable)
     XCTAssertEqual(MemoryPressureLevel(kernelLevel: -1), .unavailable)
   }
 

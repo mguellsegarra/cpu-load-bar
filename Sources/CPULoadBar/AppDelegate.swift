@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var statusItem: NSStatusItem?
   private var displayedAppearance: StatusAppearance?
   private var displayedText: String?
+  private var displayedDarkAppearance: Bool?
   private var refreshTimer: Timer?
   private var processRefreshTask: Task<Void, Never>?
   private var currentProcessMetric: ProcessMetricKind?
@@ -204,10 +205,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       statusItem?.button?.toolTip = "CPU load average (1 min): \(formattedLoad)"
 
     case .memory(let pressure):
-      let text = pressure == .critical ? "Critical" : "High"
       showStatus(
         appearance: .elevatedMemory,
-        text: text,
+        text: "Critical",
         accessibilityLabel: "Memory pressure",
         accessibilityValue: pressure.menuText
       )
@@ -223,7 +223,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   ) {
     guard let button = statusItem?.button else { return }
 
+    let darkAppearance = button.effectiveAppearance.bestMatch(
+      from: [.aqua, .darkAqua]
+    ) == .darkAqua
     let appearanceChanged = displayedAppearance != appearance
+      || displayedDarkAppearance != darkAppearance
     let color: NSColor?
     switch appearance {
     case .normalCPU: color = nil
@@ -249,6 +253,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.image = symbol
       }
       displayedAppearance = appearance
+      displayedDarkAppearance = darkAppearance
     }
 
     if appearanceChanged || displayedText != text {
@@ -267,20 +272,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private var warningRed: NSColor {
-    NSColor.systemRed.withAlphaComponent(0.9)
+    adaptiveColor(
+      light: NSColor(srgbRed: 0.70, green: 0.13, blue: 0.18, alpha: 1),
+      dark: NSColor.systemRed.withAlphaComponent(0.9)
+    )
   }
 
   private var memoryPurple: NSColor {
-    NSColor.systemPurple.withAlphaComponent(0.9)
+    adaptiveColor(
+      light: NSColor(srgbRed: 0.40, green: 0.18, blue: 0.59, alpha: 1),
+      dark: NSColor.systemPurple.withAlphaComponent(0.9)
+    )
+  }
+
+  private func adaptiveColor(light: NSColor, dark: NSColor) -> NSColor {
+    NSColor(name: nil) { appearance in
+      appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+    }
   }
 
   private func updateMemoryPressureItem(_ pressure: MemoryPressureLevel) {
     let title = "Memory pressure: \(pressure.menuText)"
     let color: NSColor?
     switch pressure {
-    case .warning: color = .systemYellow
-    case .urgent: color = .systemOrange
-    case .critical: color = .systemRed
+    case .warning:
+      color = adaptiveColor(
+        light: NSColor(srgbRed: 0.46, green: 0.31, blue: 0.02, alpha: 1),
+        dark: .systemYellow
+      )
+    case .critical: color = warningRed
     case .normal, .unavailable: color = nil
     }
 
