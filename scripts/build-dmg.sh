@@ -33,12 +33,21 @@ mounted=true
 
 ditto "$app_dir" "$mount_dir/CPU Load Bar.app"
 ln -s /Applications "$mount_dir/Applications"
-mkdir "$mount_dir/.background"
-magick -font /System/Library/Fonts/Supplemental/Arial.ttf -background none \
+magick -density 96 -font /System/Library/Fonts/Supplemental/Arial.ttf -background none \
   "$project_dir/Resources/DMGBackground.svg" \
-  "$mount_dir/.background/background.png"
+  "$scratch_dir/background.png"
+magick -density 192 -font /System/Library/Fonts/Supplemental/Arial.ttf -background none \
+  "$project_dir/Resources/DMGBackground.svg" \
+  "$scratch_dir/background@2x.png"
+tiffutil -cathidpicheck "$scratch_dir/background.png" \
+  "$scratch_dir/background@2x.png" \
+  -out "$mount_dir/CPU Load Bar.app/Contents/Resources/DMGBackground.tiff"
+codesign --force --sign - "$mount_dir/CPU Load Bar.app"
 
 osascript "$project_dir/scripts/layout-dmg.applescript" "$mount_dir"
+if [[ -d "$mount_dir/.fseventsd" ]]; then
+  rm -rf "$mount_dir/.fseventsd"
+fi
 sync
 hdiutil detach "$mount_dir"
 mounted=false

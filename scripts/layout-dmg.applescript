@@ -1,7 +1,7 @@
 on run argv
     set mountPath to item 1 of argv
     set diskFolder to (POSIX file mountPath) as alias
-    set backgroundFile to (POSIX file (mountPath & "/.background/background.png")) as alias
+    set backgroundFile to (POSIX file (mountPath & "/CPU Load Bar.app/Contents/Resources/DMGBackground.tiff")) as alias
 
     tell application "Finder"
         tell folder diskFolder
@@ -9,7 +9,7 @@ on run argv
             set current view of container window to icon view
             set toolbar visible of container window to false
             set statusbar visible of container window to false
-            set bounds of container window to {200, 160, 840, 560}
+            set bounds of container window to {200, 160, 840, 620}
 
             tell icon view options of container window
                 set icon size to 112
