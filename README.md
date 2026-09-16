@@ -9,6 +9,12 @@ A tiny, native macOS menu bar app that keeps the current CPU load average visibl
 
 CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open its menu for the 1, 5 and 15-minute values, the number of logical CPUs, a manual refresh action and Quit.
 
+<p align="center">
+  <img src="docs/screenshots/high-cpu.png" width="600" alt="CPU Load Bar showing a red CPU alert, the top three CPU processes, and urgent memory pressure in its macOS menu" />
+  <br />
+  <sub>CPU alert · top processes and memory pressure at a glance</sub>
+</p>
+
 ## Features
 
 - Native Swift and AppKit
