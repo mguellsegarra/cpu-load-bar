@@ -3,9 +3,17 @@ import ServiceManagement
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+  private enum StatusAppearance: Equatable {
+    case normalCPU
+    case elevatedCPU
+    case elevatedMemory
+  }
+
   private let refreshInterval: TimeInterval = 2
   private let processRefreshInterval: TimeInterval = 10
   private var statusItem: NSStatusItem?
+  private var displayedAppearance: StatusAppearance?
+  private var displayedText: String?
   private var refreshTimer: Timer?
   private var processRefreshTask: Task<Void, Never>?
   private var currentProcessMetric: ProcessMetricKind?
@@ -56,15 +64,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func configureStatusItem() {
     let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+    item.autosaveName = "dev.ondori.cpu-load-bar.status"
     statusItem = item
 
     if let button = item.button {
       button.imagePosition = .imageLeading
       showStatus(
-        symbolName: "cpu",
-        symbolDescription: "CPU",
+        appearance: .normalCPU,
         text: "—",
-        color: nil,
         accessibilityLabel: "CPU load average",
         accessibilityValue: "Unavailable"
       )
@@ -172,10 +179,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func showUnavailableState() {
     showStatus(
-      symbolName: "cpu",
-      symbolDescription: "CPU",
+      appearance: .normalCPU,
       text: "—",
-      color: nil,
       accessibilityLabel: "CPU load average",
       accessibilityValue: "Unavailable"
     )
@@ -191,10 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     switch metric {
     case .cpu(_, let elevated):
       showStatus(
-        symbolName: "cpu",
-        symbolDescription: "CPU",
+        appearance: elevated ? .elevatedCPU : .normalCPU,
         text: formattedLoad,
-        color: elevated ? warningRed : nil,
         accessibilityLabel: "CPU load average",
         accessibilityValue: formattedLoad
       )
@@ -203,10 +206,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     case .memory(let pressure):
       let text = pressure == .critical ? "Critical" : "High"
       showStatus(
-        symbolName: "memorychip",
-        symbolDescription: "Memory",
+        appearance: .elevatedMemory,
         text: text,
-        color: memoryPurple,
         accessibilityLabel: "Memory pressure",
         accessibilityValue: pressure.menuText
       )
@@ -215,35 +216,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func showStatus(
-    symbolName: String,
-    symbolDescription: String,
+    appearance: StatusAppearance,
     text: String,
-    color: NSColor?,
     accessibilityLabel: String,
     accessibilityValue: String
   ) {
     guard let button = statusItem?.button else { return }
 
-    let symbol = NSImage(
-      systemSymbolName: symbolName,
-      accessibilityDescription: symbolDescription
-    )
-    button.contentTintColor = nil
+    let appearanceChanged = displayedAppearance != appearance
+    let color: NSColor?
+    switch appearance {
+    case .normalCPU: color = nil
+    case .elevatedCPU: color = warningRed
+    case .elevatedMemory: color = memoryPurple
+    }
 
-    if let color {
-      let configuration = NSImage.SymbolConfiguration(paletteColors: [color])
-      let image = symbol?.withSymbolConfiguration(configuration)
-      image?.isTemplate = false
-      button.image = image
-      button.attributedTitle = NSAttributedString(
-        string: " \(text)",
-        attributes: [.foregroundColor: color]
+    if appearanceChanged {
+      let isMemory = appearance == .elevatedMemory
+      let symbol = NSImage(
+        systemSymbolName: isMemory ? "memorychip" : "cpu",
+        accessibilityDescription: isMemory ? "Memory" : "CPU"
       )
-    } else {
-      symbol?.isTemplate = true
-      button.image = symbol
-      button.attributedTitle = NSAttributedString(string: "")
-      button.title = " \(text)"
+      button.contentTintColor = nil
+
+      if let color {
+        let configuration = NSImage.SymbolConfiguration(paletteColors: [color])
+        let image = symbol?.withSymbolConfiguration(configuration)
+        image?.isTemplate = false
+        button.image = image
+      } else {
+        symbol?.isTemplate = true
+        button.image = symbol
+      }
+      displayedAppearance = appearance
+    }
+
+    if appearanceChanged || displayedText != text {
+      if let color {
+        button.attributedTitle = NSAttributedString(
+          string: " \(text)",
+          attributes: [.foregroundColor: color]
+        )
+      } else {
+        button.title = " \(text)"
+      }
+      displayedText = text
     }
     button.setAccessibilityLabel(accessibilityLabel)
     button.setAccessibilityValue(accessibilityValue)
@@ -273,7 +290,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         attributes: [.foregroundColor: color]
       )
     } else {
-      memoryPressureItem.attributedTitle = NSAttributedString(string: "")
+      memoryPressureItem.attributedTitle = nil
       memoryPressureItem.title = title
     }
   }

@@ -18,6 +18,7 @@ CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open 
 ## Features
 
 - Native Swift and AppKit
+- Custom app icon with an editable SVG source
 - Universal binary for Apple Silicon and Intel Macs
 - One-minute load visible in the menu bar
 - 1, 5 and 15-minute values in the menu
@@ -37,7 +38,7 @@ CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open 
 
 ## Install
 
-Download `CPU-Load-Bar.zip` from the [latest release](https://github.com/mguellsegarra/cpu-load-bar/releases/latest), unzip it and move **CPU Load Bar.app** to Applications.
+Download `CPU-Load-Bar.dmg` from [GitHub Releases](https://github.com/mguellsegarra/cpu-load-bar/releases), open it and drag **CPU Load Bar.app** onto **Applications**.
 
 The downloadable app is ad-hoc signed but not Apple-notarized. On first launch, macOS may require you to right-click the app and choose **Open**.
 
@@ -49,10 +50,15 @@ Xcode with the macOS SDK and Swift 6 are required.
 git clone https://github.com/mguellsegarra/cpu-load-bar.git
 cd cpu-load-bar
 ./scripts/build-app.sh
-open "build/CPU Load Bar.app"
+ditto "build/CPU Load Bar.app" "/Applications/CPU Load Bar.app"
+open "/Applications/CPU Load Bar.app"
 ```
 
 The script builds a universal release binary, creates the app bundle at `build/CPU Load Bar.app`, and applies an ad-hoc signature.
+Quit any running copy before replacing it. On macOS 27, run the app from `/Applications` for reliable menu bar visibility, especially with Bartender; running the build copy directly may make the item appear missing.
+
+The app icon is generated from `Resources/AppIcon.svg`. To regenerate `Resources/AppIcon.icns` after editing the SVG, install ImageMagick and run `./scripts/build-icon.sh`.
+To build the drag-to-Applications disk image locally, install ImageMagick and run `./scripts/build-dmg.sh`. The DMG will be written to `build/CPU-Load-Bar.dmg`.
 
 ## Understanding load average
 

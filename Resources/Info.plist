@@ -8,6 +8,8 @@
     <string>CPU Load Bar</string>
     <key>CFBundleExecutable</key>
     <string>CPULoadBar</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
     <key>CFBundleIdentifier</key>
     <string>dev.ondori.cpu-load-bar</string>
     <key>CFBundleInfoDictionaryVersion</key>
