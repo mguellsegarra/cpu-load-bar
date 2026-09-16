@@ -52,8 +52,8 @@ enum MemoryPressureLevel: Equatable {
 
   var isElevated: Bool {
     switch self {
-    case .warning, .urgent, .critical: true
-    case .normal, .unavailable: false
+    case .urgent, .critical: true
+    case .normal, .warning, .unavailable: false
     }
   }
 
