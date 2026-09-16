@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: swift test
+
+      - name: Build app bundle
+        run: ./scripts/build-app.sh
+
+      - name: Validate bundle metadata
+        run: plutil -lint "build/CPU Load Bar.app/Contents/Info.plist"
+
+      - name: Verify signature
+        run: codesign --verify --deep --strict --verbose=2 "build/CPU Load Bar.app"
+
+      - name: Verify universal binary
+        run: |
+          file "build/CPU Load Bar.app/Contents/MacOS/CPULoadBar" | grep -q "universal binary"
+          lipo -archs "build/CPU Load Bar.app/Contents/MacOS/CPULoadBar" | grep -q "arm64"
+          lipo -archs "build/CPU Load Bar.app/Contents/MacOS/CPULoadBar" | grep -q "x86_64"
