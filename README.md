@@ -113,4 +113,4 @@ Contributions and bug reports are welcome through GitHub issues and pull request
 
 ## License
 
-[MIT](LICENSE) © 2026 Marc Güell Segarra
+[MIT](LICENSE) © Marc Güell Segarra. More about the author at [Ondori.dev](https://ondori.dev/). If you find the app useful, you can [buy me a coffee](https://buymeacoffee.com/mguellsegarra).
