@@ -1,11 +1,19 @@
-# CPU Load Bar
+<p align="center">
+  <img src="Resources/AppIcon.svg" width="112" alt="CPU Load Bar app icon" />
+</p>
 
-[![CI](https://github.com/mguellsegarra/cpu-load-bar/actions/workflows/ci.yml/badge.svg)](https://github.com/mguellsegarra/cpu-load-bar/actions/workflows/ci.yml)
-[![macOS 13+](https://img.shields.io/badge/macOS-13%2B-black?logo=apple)](https://support.apple.com/macos)
-[![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)](https://www.swift.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<h1 align="center">CPU Load Bar</h1>
 
-A tiny, native macOS menu bar app that keeps the current CPU load average visible at a glance.
+<p align="center">
+  A tiny, native macOS menu bar app that keeps the current CPU load average visible at a glance.
+</p>
+
+<p align="center">
+  <a href="https://github.com/mguellsegarra/cpu-load-bar/actions/workflows/ci.yml"><img src="https://github.com/mguellsegarra/cpu-load-bar/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://support.apple.com/macos"><img src="https://img.shields.io/badge/macOS-13%2B-black?logo=apple" alt="macOS 13+" /></a>
+  <a href="https://www.swift.org/"><img src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&amp;logoColor=white" alt="Swift 6" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+</p>
 
 CPU Load Bar shows the one-minute load average beside a native CPU symbol. Open its menu for the 1, 5 and 15-minute values, the number of logical CPUs, a manual refresh action and Quit.
 
@@ -31,7 +39,7 @@ The screenshot was captured before the memory-pressure level correction; current
 - Purple memory-chip indicator when memory pressure is critical and CPU load is normal
 - Memory-pressure menu detail graded by level: yellow for warning and red for critical
 - Alert colors adapt to light and dark appearances; normal text follows macOS menu bar colors
-- Progressive CPU alert colors based on load per active CPU and recent CPU usage
+- Progressive CPU alert colors based on load per active CPU
 - Two-second refresh interval
 - VoiceOver label and current-value support
 - No Dock icon, third-party dependencies, network requests, analytics or stored data
